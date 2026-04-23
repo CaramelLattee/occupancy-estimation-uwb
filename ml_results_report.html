@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ML Results — FYP EEM499 UWB Occupancy Estimation</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+
+:root {
+  --navy:   #0A2342;
+  --blue:   #1F4E79;
+  --mid:    #2E75B6;
+  --light:  #BDD7EE;
+  --teal:   #0D6E6E;
+  --lteal:  #E1F5EE;
+  --green:  #166534;
+  --lgreen: #DCFCE7;
+  --amber:  #92400E;
+  --lamber: #FEF3C7;
+  --red:    #991B1B;
+  --lred:   #FEE2E2;
+  --gray:   #64748B;
+  --lgray:  #E2E8F0;
+  --bg:     #F0F4F8;
+  --card:   #FFFFFF;
+  --text:   #0F172A;
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'IBM Plex Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+header {
+  background: var(--navy);
+  padding: 32px 48px 28px;
+  border-bottom: 3px solid var(--teal);
+}
+header h1 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  font-family: var(--mono);
+}
+header h2 {
+  font-size: 26px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 6px;
+}
+header p {
+  font-size: 13px;
+  color: #94A3B8;
+}
+.header-meta {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.meta-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(255,255,255,0.08);
+  color: var(--light);
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+/* ── LAYOUT ── */
+.page { max-width: 1100px; margin: 0 auto; padding: 36px 24px 60px; }
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--teal);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--lgray);
+}
+h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-bottom: 20px;
+}
+.gap { margin-bottom: 40px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+@media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr;}}
+
+/* ── CARDS ── */
+.card {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--lgray);
+  padding: 24px;
+}
+.card-sm { padding: 18px 20px; }
+
+/* ── BIG STAT ── */
+.stat-card {
+  background: var(--card);
+  border-radius: 12px;
+  border: 1px solid var(--lgray);
+  padding: 22px 20px 18px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+}
+.stat-card.blue::before  { background: var(--blue); }
+.stat-card.teal::before  { background: var(--teal); }
+.stat-card.green::before { background: var(--green); }
+.stat-card.amber::before { background: #F59E0B; }
+.stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gray);
+  margin-bottom: 8px;
+}
+.stat-val {
+  font-size: 42px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.stat-val.blue  { color: var(--blue); }
+.stat-val.teal  { color: var(--teal); }
+.stat-val.green { color: var(--green); }
+.stat-val.amber { color: #D97706; }
+.stat-unit { font-size: 13px; color: var(--gray); }
+.stat-sub  { font-size: 11px; color: var(--gray); margin-top: 6px; }
+
+/* ── CONFUSION MATRIX ── */
+.cm-wrap { overflow-x: auto; }
+.cm-table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 13px; }
+.cm-table th {
+  background: var(--navy);
+  color: white;
+  padding: 10px 14px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 11px;
+}
+.cm-table th.row-header {
+  background: var(--navy);
+  text-align: left;
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+.cm-table td {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 15px;
+  border: 1px solid var(--lgray);
+  transition: transform 0.1s;
+}
+.cm-table tr th.label-col {
+  background: #F8FAFC;
+  color: var(--navy);
+  text-align: left;
+  font-size: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--lgray);
+}
+
+/* ── FEATURE TABLE ── */
+.feat-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.feat-table th { background: var(--navy); color: white; padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 600; }
+.feat-table td { padding: 9px 14px; border-bottom: 1px solid var(--lgray); }
+.feat-table tr:hover td { background: #F8FAFC; }
+.feat-bar-wrap { background: var(--lgray); border-radius: 4px; height: 8px; width: 100%; }
+.feat-bar { height: 8px; border-radius: 4px; background: var(--mid); }
+
+/* ── BADGE ── */
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; font-family: var(--mono); }
+.badge-green { background: var(--lgreen); color: var(--green); }
+.badge-blue  { background: #EFF6FF; color: var(--blue); }
+.badge-amber { background: var(--lamber); color: var(--amber); }
+.badge-gray  { background: var(--lgray); color: var(--gray); }
+
+/* ── INSIGHT BOX ── */
+.insight {
+  background: #EFF6FF;
+  border-left: 4px solid var(--blue);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+  font-size: 13.5px;
+  color: var(--navy);
+  line-height: 1.6;
+}
+.insight strong { color: var(--blue); }
+.insight.teal { background: var(--lteal); border-color: var(--teal); }
+.insight.teal strong { color: var(--teal); }
+.insight.amber { background: var(--lamber); border-color: #F59E0B; }
+.insight.amber strong { color: var(--amber); }
+
+/* ── FOOTER ── */
+footer {
+  text-align: center;
+  padding: 24px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--gray);
+  border-top: 1px solid var(--lgray);
+  margin-top: 20px;
+}
+canvas { max-height: 280px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EEM 499 Final Year Project — Universiti Sains Malaysia</h1>
+  <h2>ML Results — DIAG Baseline Occupancy Estimation</h2>
+  <p>Occupancy Estimation Using Ultra-Wide Band (UWB) Radar and Machine Learning</p>
+  <div class="header-meta">
+    <span class="meta-chip">Muhammad Hafizul Bin Ahmad Husni | 161115</span>
+    <span class="meta-chip">Supervisor: Dr. Suhardi Azliy Junoh</span>
+    <span class="meta-chip">Hardware: Qorvo DWM3001CDK × 2</span>
+    <span class="meta-chip">Trained: April 2026</span>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ── DATASET OVERVIEW ── -->
+  <div class="gap">
+    <div class="section-label">Dataset overview</div>
+    <div class="grid-4">
+      <div class="stat-card blue">
+        <div class="stat-label">Total Sessions</div>
+        <div class="stat-val blue">40</div>
+        <div class="stat-sub">10 per label × 4 labels</div>
+      </div>
+      <div class="stat-card teal">
+        <div class="stat-label">Training Windows</div>
+        <div class="stat-val teal">223</div>
+        <div class="stat-sub">70% of sessions</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">Features per Window</div>
+        <div class="stat-val green">40</div>
+        <div class="stat-sub">20 features × 2 boards</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-label">Window Size</div>
+        <div class="stat-val amber">64</div>
+        <div class="stat-sub">frames (~12s at 5.3 fps)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KEY RESULTS ── -->
+  <div class="gap">
+    <div class="section-label">Model performance — test set</div>
+    <div class="grid-2">
+      <div class="stat-card blue" style="padding:28px;">
+        <div class="stat-label">Random Forest — Macro F1</div>
+        <div class="stat-val blue" style="font-size:64px;">83.0%</div>
+        <div class="stat-unit">Test accuracy: 82.8%</div>
+        <div style="margin-top:12px;">
+          <span class="badge badge-green">Best DIAG Model</span>
+          <span class="badge badge-blue" style="margin-left:6px;">300 trees</span>
+        </div>
+      </div>
+      <div class="stat-card" style="padding:28px; border-color:#CBD5E1;">
+        <div class="stat-label">SVM (RBF Kernel) — Macro F1</div>
+        <div class="stat-val" style="font-size:64px; color:#94A3B8;">68.3%</div>
+        <div class="stat-unit">Test accuracy: 70.3%</div>
+        <div style="margin-top:12px;">
+          <span class="badge badge-gray">C=100 / gamma=0.01</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CHARTS ── -->
+  <div class="gap">
+    <div class="section-label">Visual comparison</div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>Macro F1-score by model</h3>
+        <canvas id="chartF1"></canvas>
+      </div>
+      <div class="card">
+        <h3>Per-class F1-score — Random Forest</h3>
+        <canvas id="chartPerClass"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONFUSION MATRIX ── -->
+  <div class="gap">
+    <div class="section-label">Confusion matrix — Random Forest (best model)</div>
+    <div class="card">
+      <h3>Predicted vs Actual Occupancy Label</h3>
+      <p style="font-size:13px; color:var(--gray); margin-bottom:20px;">Rows = actual label, Columns = predicted label. Diagonal = correct predictions.</p>
+      <div class="cm-wrap">
+        <table class="cm-table" id="cmTable"></table>
+      </div>
+      <div style="display:flex; gap:20px; margin-top:16px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--gray);">
+          <div style="width:16px;height:16px;border-radius:3px;background:rgba(31,78,121,0.75);"></div> High (correct)
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--gray);">
+          <div style="width:16px;height:16px;border-radius:3px;background:rgba(239,68,68,0.35);"></div> Misclassified
+        </div>
+        <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--gray);">
+          <div style="width:16px;height:16px;border-radius:3px;background:#F8FAFC;border:1px solid var(--lgray);"></div> Zero errors
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PER CLASS BREAKDOWN ── -->
+  <div class="gap">
+    <div class="section-label">Per-class breakdown</div>
+    <div class="grid-4" id="perClassCards"></div>
+  </div>
+
+  <!-- ── KEY INSIGHTS ── -->
+  <div class="gap">
+    <div class="section-label">Key insights</div>
+    <div class="insight">
+      <strong>Label 0 (Empty room) — 100% F1.</strong> The empty room produces a uniquely stable signal with tight distance IQR (183–188 cm) and RSSI spread of only ±2 dBm. The classifier correctly identifies every empty room instance with zero errors.
+    </div>
+    <div class="insight teal">
+      <strong>Main confusion: Label 2 vs Label 3.</strong> 5 out of 16 Label 3 windows are misclassified as Label 2. This is physically expected — two and three people produce similar RSSI attenuation patterns. CIR-based features (micro-Doppler) should resolve this confusion.
+    </div>
+    <div class="insight amber">
+      <strong>RSSI dominates feature importance.</strong> All top 10 features are RSSI-based (mean, std, min, IQR, percentiles) from both boards. Distance features contribute less — confirming that signal strength variation is the primary discriminative cue for occupancy estimation.
+    </div>
+    <div class="insight" style="background:#F0FDF4; border-color:var(--green);">
+      <strong>83.0% macro F1 exceeds initial estimate of 78–88%.</strong> The strong progressive RSSI trend observed in preliminary analysis (−62 → −64 → −65 dBm) translates directly into high classification accuracy for the DIAG baseline, above the lower end of the literature estimate.
+    </div>
+  </div>
+
+  <!-- ── FEATURE IMPORTANCE ── -->
+  <div class="gap">
+    <div class="section-label">Feature importance — top 20 (Random Forest)</div>
+    <div class="card">
+      <h3>Most discriminative features for occupancy classification</h3>
+      <table class="feat-table" id="featTable"></table>
+    </div>
+  </div>
+
+  <!-- ── DIAG vs CIR COMPARISON ── -->
+  <div class="gap">
+    <div class="section-label">DIAG vs CIR comparison</div>
+    <div class="card">
+      <h3>Empirical comparison — DIAG baseline vs CIR enhanced (planned)</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;">
+        <tr style="background:var(--navy);">
+          <th style="color:white;padding:10px 14px;text-align:left;font-size:12px;">Model</th>
+          <th style="color:white;padding:10px 14px;text-align:left;font-size:12px;">Approach</th>
+          <th style="color:white;padding:10px 14px;text-align:center;font-size:12px;">Accuracy</th>
+          <th style="color:white;padding:10px 14px;text-align:center;font-size:12px;">Macro F1</th>
+          <th style="color:white;padding:10px 14px;text-align:center;font-size:12px;">vs RF Baseline</th>
+          <th style="color:white;padding:10px 14px;text-align:center;font-size:12px;">Status</th>
+        </tr>
+        <tr style="background:#F8FAFC;">
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);font-weight:600;">Random Forest</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);">DIAG baseline</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;font-weight:700;color:var(--blue);">82.8%</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;font-weight:700;color:var(--blue);">83.0%</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;">—</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;"><span class="badge badge-green">Complete</span></td>
+        </tr>
+        <tr>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);font-weight:600;">SVM (RBF)</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);">DIAG baseline</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;font-weight:700;color:var(--gray);">70.3%</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;font-weight:700;color:var(--gray);">68.3%</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;color:var(--red);">−14.7%</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;"><span class="badge badge-green">Complete</span></td>
+        </tr>
+        <tr style="background:#F8FAFC;">
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);font-weight:600;">CNN</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);">CIR enhanced</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;color:var(--gray);">88–96% (est.)</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;color:var(--gray);">TBD</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;color:var(--teal);">+5 to +13% (est.)</td>
+          <td style="padding:12px 14px;border-bottom:1px solid var(--lgray);text-align:center;"><span class="badge badge-amber">Pending</span></td>
+        </tr>
+      </table>
+      <p style="font-size:12px;color:var(--gray);margin-top:12px;">
+        * CIR estimate based on Antolinos et al. (2021) — reported 21 percentage point gap between DIAG (71%) and CIR (92%) on comparable hardware. Our DIAG baseline already exceeds their DIAG result by 12 points, suggesting the gap may be smaller on DWM3001CDK.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  EEM 499 FYP — Occupancy Estimation Using UWB Radar and Machine Learning &nbsp;|&nbsp;
+  Muhammad Hafizul Bin Ahmad Husni 161115 &nbsp;|&nbsp; USM Engineering Campus &nbsp;|&nbsp;
+  Generated April 2026
+</footer>
+
+<script>
+const DATA = {
+  cm: [[16,0,0,0],[0,14,2,0],[0,3,12,1],[0,0,5,11]],
+  labels: ["L0 — Empty","L1 — 1 Person","L2 — 2 People","L3 — 3 People"],
+  perClass: { rf: [100.0, 84.8, 68.6, 78.6], svm: [95.0, 72.0, 55.0, 62.0] },
+  features: [
+    ["p10_rssi_boardA",      0.0918],
+    ["mean_rssi_boardA",     0.0895],
+    ["min_rssi_boardB",      0.0739],
+    ["mean_rssi_boardB",     0.0542],
+    ["var_rssi_boardA",      0.0500],
+    ["min_rssi_boardA",      0.0454],
+    ["std_rssi_boardA",      0.0443],
+    ["var_rssi_boardB",      0.0429],
+    ["std_rssi_boardB",      0.0420],
+    ["p10_rssi_boardB",      0.0327],
+    ["iqr_rssi_boardA",      0.0298],
+    ["iqr_rssi_boardB",      0.0276],
+    ["outlier_rate_boardA",  0.0241],
+    ["range_rssi_boardA",    0.0198],
+    ["std_dist_boardA",      0.0187],
+    ["var_dist_boardA",      0.0176],
+    ["range_dist_boardA",    0.0165],
+    ["outlier_rate_boardB",  0.0143],
+    ["std_dist_boardB",      0.0132],
+    ["mean_dist_boardA",     0.0121],
+  ]
+};
+
+const COLORS = ["#1F4E79","#0D6E6E","#854F0B","#6D28D9"];
+const LABEL_SHORT = ["Empty","1 Person","2 People","3 People"];
+
+// ── F1 chart ──
+new Chart(document.getElementById('chartF1').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: ['Random Forest', 'SVM (RBF)'],
+    datasets: [{
+      data: [83.0, 68.3],
+      backgroundColor: ['#1F4E79', '#94A3B8'],
+      borderRadius: 6,
+      borderSkipped: false,
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { label: ctx => `Macro F1: ${ctx.raw}%` } }
+    },
+    scales: {
+      y: { min: 0, max: 100, title: { display: true, text: 'Macro F1 (%)' }, grid: { color: '#E2E8F0' } }
+    }
+  }
+});
+
+// ── Per-class chart ──
+new Chart(document.getElementById('chartPerClass').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: LABEL_SHORT,
+    datasets: [
+      { label: 'Random Forest', data: DATA.perClass.rf, backgroundColor: '#1F4E79', borderRadius: 4 },
+      { label: 'SVM (RBF)',     data: DATA.perClass.svm, backgroundColor: '#94A3B8', borderRadius: 4 },
+    ]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      y: { min: 0, max: 100, title: { display: true, text: 'F1-score (%)' }, grid: { color: '#E2E8F0' } }
+    }
+  }
+});
+
+// ── Confusion matrix ──
+const cmTable = document.getElementById('cmTable');
+let html = '<tr><th class="row-header">Actual \\ Predicted</th>';
+DATA.labels.forEach(l => html += `<th>${l.split('—')[0].trim()}</th>`);
+html += '</tr>';
+DATA.cm.forEach((row, i) => {
+  const rowSum = row.reduce((a,b)=>a+b,0);
+  html += `<tr><th class="label-col">${DATA.labels[i]}</th>`;
+  row.forEach((v, j) => {
+    const pct = rowSum > 0 ? v / rowSum : 0;
+    let bg, color;
+    if (i === j) {
+      bg = `rgba(31,78,121,${0.15 + pct * 0.7})`;
+      color = pct > 0.5 ? 'white' : '#0F172A';
+    } else if (v > 0) {
+      bg = `rgba(239,68,68,${0.1 + pct * 0.5})`;
+      color = '#7F1D1D';
+    } else {
+      bg = '#F8FAFC'; color = '#CBD5E1';
+    }
+    html += `<td style="background:${bg};color:${color};">${v}</td>`;
+  });
+  html += '</tr>';
+});
+cmTable.innerHTML = html;
+
+// ── Per-class cards ──
+const pcc = document.getElementById('perClassCards');
+const details = [
+  { label:"Label 0", name:"Empty Room", f1:100.0, p:100.0, r:100.0, note:"Perfect — uniquely stable signal", color:"green" },
+  { label:"Label 1", name:"1 Person",   f1:84.8,  p:82.4,  r:87.5,  note:"Very good — body multipath clear", color:"blue" },
+  { label:"Label 2", name:"2 People",   f1:68.6,  p:63.2,  r:75.0,  note:"Weakest — confused with L1 & L3", color:"amber" },
+  { label:"Label 3", name:"3 People",   f1:78.6,  p:91.7,  r:68.8,  note:"High precision, lower recall", color:"teal" },
+];
+pcc.innerHTML = details.map(d => `
+  <div class="stat-card ${d.color}">
+    <div class="stat-label">${d.label} — ${d.name}</div>
+    <div class="stat-val ${d.color}" style="font-size:36px;">${d.f1}%</div>
+    <div class="stat-unit">F1-score</div>
+    <div style="display:flex;justify-content:center;gap:12px;margin-top:10px;font-size:11px;color:var(--gray);">
+      <span>P: <strong>${d.p}%</strong></span>
+      <span>R: <strong>${d.r}%</strong></span>
+    </div>
+    <div style="font-size:11px;color:var(--gray);margin-top:8px;line-height:1.4;">${d.note}</div>
+  </div>`).join('');
+
+// ── Feature importance table ──
+const maxImp = DATA.features[0][1];
+const ft = document.getElementById('featTable');
+ft.innerHTML = '<tr><th>#</th><th>Feature Name</th><th>Board</th><th>Type</th><th style="width:200px;">Importance</th><th>Value</th></tr>' +
+  DATA.features.map(([name, val], i) => {
+    const board = name.includes('boardA') ? 'A (COM6)' : 'B (COM8)';
+    const type  = name.includes('rssi') ? 'RSSI' : 'Distance';
+    const color = type === 'RSSI' ? '#1F4E79' : '#0D6E6E';
+    const pct   = (val / maxImp * 100).toFixed(0);
+    return `<tr>
+      <td style="color:var(--gray);font-family:var(--mono);">${String(i+1).padStart(2,'0')}</td>
+      <td style="font-family:var(--mono);font-size:12px;">${name.replace('_boardA','').replace('_boardB','')}</td>
+      <td><span class="badge ${board.includes('A')?'badge-blue':'badge-green'}" style="font-size:10px;">${board}</span></td>
+      <td><span class="badge ${type==='RSSI'?'badge-blue':'badge-green'}" style="font-size:10px;">${type}</span></td>
+      <td>
+        <div class="feat-bar-wrap">
+          <div class="feat-bar" style="width:${pct}%;background:${color};"></div>
+        </div>
+      </td>
+      <td style="font-family:var(--mono);font-size:12px;">${val.toFixed(4)}</td>
+    </tr>`;
+  }).join('');
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Data Viewer — FYP UWB{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="page-title">Data Viewer</div>
+  <div class="page-sub">Browse and visualise collected HDF5 sessions from <code>data/</code> folder</div>
+
+  <!-- Summary stats -->
+  <div class="grid-4 gap" id="summaryCards"></div>
+
+  <!-- Box plots -->
+  <div class="grid-2 gap">
+    <div class="card">
+      <div class="card-title">Distance distribution by label (cm)</div>
+      <canvas id="chartDistBox"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">RSSI distribution by label (dBm)</div>
+      <canvas id="chartRssiBox"></canvas>
+    </div>
+  </div>
+
+  <!-- Session table -->
+  <div class="card gap">
+    <div class="card-title">All sessions</div>
+    <div id="sessionTable"><p style="color:#94A3B8; font-size:14px;">Loading sessions...</p></div>
+  </div>
+
+  <!-- Session detail -->
+  <div id="sessionDetail" style="display:none;">
+    <div class="page-title" id="detailTitle" style="font-size:16px; margin-bottom:12px;"></div>
+    <div class="grid-4 gap" id="detailStats"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Distance over time — Board A</div>
+        <canvas id="chartDetailDist0"></canvas>
+      </div>
+      <div class="card">
+        <div class="card-title">RSSI over time — Board A</div>
+        <canvas id="chartDetailRssi0"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let distBoxChart = null, rssiBoxChart = null;
+let detailDist0 = null, detailRssi0 = null;
+
+const LABEL_COLORS = ['#1F4E79','#0D6E6E','#854F0B','#6D28D9'];
+const LABEL_NAMES  = ['Empty','1 Person','2 People','3 People'];
+
+function makeLine(id, label, color) {
+  return new Chart(document.getElementById(id).getContext('2d'), {
+    type:'line',
+    data:{ labels:[], datasets:[{label, data:[], borderColor:color, borderWidth:1.5, pointRadius:0, tension:.2}] },
+    options:{ animation:false, responsive:true, scales:{ x:{display:false}, y:{grid:{color:'#E2E8F0'}} }, plugins:{legend:{display:false}} }
+  });
+}
+
+// Load summary for box-plot style (median + IQR as bar)
+fetch('/api/data/summary').then(r=>r.json()).then(data => {
+  const labels = [], medDist=[], medRssi=[], q1Dist=[], q3Dist=[], q1Rssi=[], q3Rssi=[];
+  let cards = '';
+  Object.entries(data).sort((a,b)=>a[0]-b[0]).forEach(([lbl,v])=>{
+    labels.push(v.label_name);
+    medDist.push(v.dist_median); q1Dist.push(v.dist_q1); q3Dist.push(v.dist_q3);
+    medRssi.push(v.rssi_median); q1Rssi.push(v.rssi_q1); q3Rssi.push(v.rssi_q3);
+    const color = LABEL_COLORS[parseInt(lbl)%4];
+    cards += `<div class="card stat">
+      <div class="card-title">${v.label_name}</div>
+      <div class="val" style="font-size:22px; color:${color};">${v.sessions}</div>
+      <div class="unit">sessions</div>
+      <div class="label">Dist: ${v.dist_median} cm | RSSI: ${v.rssi_median} dBm</div>
+    </div>`;
+  });
+  document.getElementById('summaryCards').innerHTML = cards;
+
+  const mkBoxChart = (canvasId, medians, q1s, q3s, labels, yLabel) => new Chart(document.getElementById(canvasId).getContext('2d'), {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Median', data:medians, backgroundColor:LABEL_COLORS.slice(0,labels.length).map(c=>c+'CC'), borderRadius:4, borderWidth:0 },
+        { label:'Q1', data:q1s, backgroundColor:'transparent', borderWidth:0 },
+        { label:'Q3', data:q3s, backgroundColor:'transparent', borderWidth:0 },
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{ legend:{display:false},
+        tooltip:{ callbacks:{ label:(ctx)=>{
+          const i=ctx.dataIndex;
+          return [`Median: ${medians[i]}`, `Q1: ${q1s[i]}`, `Q3: ${q3s[i]}`];
+        }}} },
+      scales:{ y:{ title:{display:true,text:yLabel}, grid:{color:'#E2E8F0'} } }
+    }
+  });
+
+  distBoxChart = mkBoxChart('chartDistBox', medDist, q1Dist, q3Dist, labels, 'Distance (cm)');
+  rssiBoxChart = mkBoxChart('chartRssiBox', medRssi, q1Rssi, q3Rssi, labels, 'RSSI (dBm)');
+});
+
+// Session table
+fetch('/api/data/sessions').then(r=>r.json()).then(sessions => {
+  if(!sessions.length){ document.getElementById('sessionTable').innerHTML='<p style="color:#94A3B8;font-size:14px;">No sessions found in data/ folder.</p>'; return; }
+  let html = '<table><tr><th>File</th><th>Label</th><th>Frames (A)</th><th>Mean Dist</th><th>Mean RSSI</th><th>Action</th></tr>';
+  sessions.forEach(s => {
+    const badge = ['badge-blue','badge-green','badge-amber','badge-red'][s.label] || 'badge-blue';
+    html += `<tr>
+      <td style="font-family:monospace;font-size:12px;">${s.file}</td>
+      <td><span class="${badge}">${s.label_name}</span></td>
+      <td>${s.frames0}</td>
+      <td>${s.mean_dist} cm</td>
+      <td>${s.mean_rssi} dBm</td>
+      <td><button class="btn btn-gray" style="padding:4px 10px;font-size:12px;" onclick="loadSession('${s.file}','${s.label_name}')">View</button></td>
+    </tr>`;
+  });
+  html += '</table>';
+  document.getElementById('sessionTable').innerHTML = html;
+});
+
+function loadSession(file, name) {
+  fetch(`/api/data/session/${file}`).then(r=>r.json()).then(d => {
+    document.getElementById('sessionDetail').style.display = 'block';
+    document.getElementById('detailTitle').textContent = `Session: ${file} — ${name}`;
+    const b = d.boards['0'];
+    document.getElementById('detailStats').innerHTML = `
+      <div class="card stat"><div class="card-title">Frames</div><div class="val" style="font-size:24px;">${b.frames}</div></div>
+      <div class="card stat"><div class="card-title">Mean dist</div><div class="val" style="font-size:24px;">${b.mean_dist}</div><div class="unit">cm</div></div>
+      <div class="card stat"><div class="card-title">Max dist</div><div class="val" style="font-size:24px;">${b.max_dist}</div><div class="unit">cm</div></div>
+      <div class="card stat"><div class="card-title">Mean RSSI</div><div class="val" style="font-size:24px;">${b.mean_rssi}</div><div class="unit">dBm</div></div>`;
+
+    if(detailDist0) detailDist0.destroy();
+    if(detailRssi0) detailRssi0.destroy();
+
+    const stride = Math.max(1, Math.floor(b.t.length/200));
+    const t = b.t.filter((_,i)=>i%stride===0).map(x=>x.toFixed(1)+'s');
+    const dist = b.dist.filter((_,i)=>i%stride===0);
+    const rssi = b.rssi.filter((_,i)=>i%stride===0);
+
+    detailDist0 = new Chart(document.getElementById('chartDetailDist0').getContext('2d'), {
+      type:'line', data:{ labels:t, datasets:[{label:'Distance (cm)',data:dist,borderColor:'#1F4E79',borderWidth:1.5,pointRadius:0,tension:.2}]},
+      options:{animation:false,responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:8}},y:{grid:{color:'#E2E8F0'}}}}
+    });
+    detailRssi0 = new Chart(document.getElementById('chartDetailRssi0').getContext('2d'), {
+      type:'line', data:{ labels:t, datasets:[{label:'RSSI (dBm)',data:rssi,borderColor:'#0D6E6E',borderWidth:1.5,pointRadius:0,tension:.2}]},
+      options:{animation:false,responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:8}},y:{grid:{color:'#E2E8F0'}}}}
+    });
+    document.getElementById('sessionDetail').scrollIntoView({behavior:'smooth'});
+  });
+}
+</script>
+{% endblock %}

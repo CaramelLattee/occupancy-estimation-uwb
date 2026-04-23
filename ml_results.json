@@ -1,0 +1,125 @@
+{
+  "status": "complete",
+  "trained_at": "2026-04-22 20:01:34",
+  "dataset": {
+    "sessions_total": 40,
+    "windows_train": 223,
+    "windows_val": 32,
+    "windows_test": 64,
+    "labels": {
+      "0": 10,
+      "1": 10,
+      "2": 10,
+      "3": 10
+    },
+    "window_size": 64,
+    "step_size": 32,
+    "n_features": 40
+  },
+  "results": [
+    {
+      "model": "Random Forest",
+      "approach": "DIAG baseline",
+      "accuracy": 0.8281,
+      "f1": 0.83,
+      "params": {
+        "n_estimators": 300,
+        "class_weight": "balanced"
+      }
+    },
+    {
+      "model": "SVM (RBF)",
+      "approach": "DIAG baseline",
+      "accuracy": 0.7031,
+      "f1": 0.683,
+      "params": {
+        "C": 100,
+        "gamma": "0.01"
+      }
+    }
+  ],
+  "comparison": [
+    {
+      "model": "Random Forest",
+      "approach": "DIAG",
+      "accuracy": 0.8281,
+      "f1": 0.83
+    },
+    {
+      "model": "SVM (RBF)",
+      "approach": "DIAG",
+      "accuracy": 0.7031,
+      "f1": 0.683
+    },
+    {
+      "model": "CNN",
+      "approach": "CIR",
+      "accuracy": null,
+      "f1": null
+    }
+  ],
+  "cm_diag": [
+    [
+      16,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      14,
+      2,
+      0
+    ],
+    [
+      0,
+      3,
+      12,
+      1
+    ],
+    [
+      0,
+      0,
+      5,
+      11
+    ]
+  ],
+  "per_class": {
+    "Random Forest": {
+      "0": 100.0,
+      "1": 84.8,
+      "2": 68.6,
+      "3": 78.6
+    },
+    "SVM (RBF)": {
+      "0": 100.0,
+      "1": 75.0,
+      "2": 63.4,
+      "3": 34.8
+    }
+  },
+  "feature_importance": {
+    "p10_rssi_boardA": 0.091835,
+    "mean_rssi_boardA": 0.089542,
+    "min_rssi_boardB": 0.07394,
+    "mean_rssi_boardB": 0.05416,
+    "var_rssi_boardA": 0.050012,
+    "min_rssi_boardA": 0.045402,
+    "std_rssi_boardA": 0.044291,
+    "var_rssi_boardB": 0.042851,
+    "std_rssi_boardB": 0.041973,
+    "p10_rssi_boardB": 0.032719
+  },
+  "labels_present": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "label_names": {
+    "0": "Empty",
+    "1": "1 Person",
+    "2": "2 People",
+    "3": "3 People"
+  }
+}

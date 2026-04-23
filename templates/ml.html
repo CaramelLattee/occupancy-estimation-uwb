@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}ML Results — FYP UWB{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="page-title">ML Results</div>
+  <div class="page-sub">Classifier performance — Random Forest, SVM, CNN — DIAG vs CIR comparison</div>
+
+  <div id="pendingMsg" class="card gap" style="display:none; background:#FEF3C7; border:1px solid #F59E0B;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span style="font-size:24px;">⏳</span>
+      <div>
+        <div style="font-weight:700; color:#92400E; margin-bottom:4px;">ML Training Not Yet Completed</div>
+        <div style="font-size:13px; color:#92400E;">Run <code>python scripts/train_baseline.py</code> to generate results.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="resultsSection" style="display:none;">
+    <div class="gap" id="accuracyCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;"></div>
+    <div class="grid-2 gap">
+      <div class="card"><div class="card-title">Macro F1-score by model</div><canvas id="chartF1"></canvas></div>
+      <div class="card"><div class="card-title">Per-class F1-score — Random Forest</div><canvas id="chartPerClass"></canvas></div>
+    </div>
+    <div class="card gap">
+      <div class="card-title">Confusion matrix — Random Forest (best DIAG model)</div>
+      <p style="font-size:13px;color:#64748B;margin-bottom:16px;">Rows = actual, Columns = predicted. Diagonal = correct predictions.</p>
+      <div id="cmDiag" style="overflow-x:auto;"></div>
+    </div>
+    <div class="gap" id="perClassCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;"></div>
+    <div class="card gap">
+      <div class="card-title">DIAG vs CIR empirical comparison</div>
+      <div id="comparisonTable"></div>
+      <p style="font-size:12px;color:#94A3B8;margin-top:12px;">* CIR estimate based on Antolinos et al. (2021) — 21 percentage point gap between DIAG (71%) and CIR (92%) on similar hardware.</p>
+    </div>
+    <div class="card gap">
+      <div class="card-title">Top 10 most important features — Random Forest</div>
+      <div id="featureTable"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Training configuration</div>
+      <div id="datasetInfo"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch('/api/ml/results').then(r=>r.json()).then(data=>{
+  if(data.status==='pending'){ document.getElementById('pendingMsg').style.display='block'; return; }
+  document.getElementById('resultsSection').style.display='block';
+
+  const LN = data.label_names||{"0":"Empty","1":"1 Person","2":"2 People","3":"3 People"};
+  const CC = ['#1F4E79','#0D6E6E','#854F0B','#6D28D9'];
+
+  // Accuracy cards
+  document.getElementById('accuracyCards').innerHTML = data.results.map((r,i)=>{
+    const ok=r.f1!==null;
+    return `<div class="card" style="border-top:3px solid ${CC[i%4]};text-align:center;padding:20px;">
+      <div class="card-title">${r.model}</div>
+      <div style="font-size:38px;font-weight:700;color:${CC[i%4]};margin:8px 0;">${ok?(r.f1*100).toFixed(1)+'%':'Pending'}</div>
+      <div style="font-size:12px;color:#64748B;">Macro F1</div>
+      <div style="font-size:12px;color:#64748B;margin-top:4px;">Accuracy: ${ok?(r.accuracy*100).toFixed(1)+'%':'—'}</div>
+      <div style="margin-top:10px;"><span style="background:${ok?'#DCFCE7':'#FEF3C7'};color:${ok?'#166534':'#92400E'};
+        font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;">${ok?'Complete':'Pending'}</span></div>
+    </div>`;
+  }).join('');
+
+  // F1 chart
+  const done = data.results.filter(r=>r.f1!==null);
+  new Chart(document.getElementById('chartF1').getContext('2d'),{
+    type:'bar',
+    data:{labels:done.map(r=>r.model),datasets:[{data:done.map(r=>+(r.f1*100).toFixed(1)),
+      backgroundColor:CC.slice(0,done.length),borderRadius:5,borderSkipped:false}]},
+    options:{responsive:true,plugins:{legend:{display:false}},
+      scales:{y:{min:0,max:100,title:{display:true,text:'Macro F1 (%)'},grid:{color:'#E2E8F0'}}}}
+  });
+
+  // Per-class chart
+  if(data.per_class&&data.per_class['Random Forest']){
+    const pcRF=data.per_class['Random Forest'], pcSVM=data.per_class['SVM (RBF)']||{};
+    const keys=Object.keys(pcRF).sort();
+    new Chart(document.getElementById('chartPerClass').getContext('2d'),{
+      type:'bar',
+      data:{labels:keys.map(k=>LN[k]||`L${k}`),datasets:[
+        {label:'Random Forest',data:keys.map(k=>pcRF[k]),backgroundColor:'#1F4E79',borderRadius:4},
+        {label:'SVM (RBF)',data:keys.map(k=>pcSVM[k]||0),backgroundColor:'#94A3B8',borderRadius:4}
+      ]},
+      options:{responsive:true,plugins:{legend:{position:'top'}},
+        scales:{y:{min:0,max:100,title:{display:true,text:'F1-score (%)'},grid:{color:'#E2E8F0'}}}}
+    });
+
+    // Per-class cards
+    const notes={"0":"Perfect — empty room has unique stable signal","1":"Very good — body multipath clear",
+      "2":"Weakest — some confusion with L1 and L3","3":"High precision, some confusion with L2"};
+    document.getElementById('perClassCards').innerHTML = keys.map((k,i)=>`
+      <div class="card" style="border-top:3px solid ${CC[i%4]};text-align:center;padding:18px;">
+        <div class="card-title">Label ${k} — ${LN[k]}</div>
+        <div style="font-size:32px;font-weight:700;color:${CC[i%4]};margin:6px 0;">${pcRF[k]}%</div>
+        <div style="font-size:11px;color:#64748B;">F1-score (RF)</div>
+        <div style="font-size:11px;color:#64748B;margin-top:8px;line-height:1.5;">${notes[k]||''}</div>
+      </div>`).join('');
+  }
+
+  // Confusion matrix
+  if(data.cm_diag){
+    const lbls=(data.labels_present||[0,1,2,3]).map(l=>`L${l} — ${LN[String(l)]||l}`);
+    let html=`<table style="width:100%;border-collapse:collapse;font-size:13px;"><tr>
+      <th style="background:#0A2342;color:white;padding:10px 14px;text-align:left;font-size:11px;">Actual \\ Predicted</th>
+      ${lbls.map(l=>`<th style="background:#0A2342;color:white;padding:10px 14px;text-align:center;font-size:11px;">${l}</th>`).join('')}
+    </tr>`;
+    data.cm_diag.forEach((row,i)=>{
+      const rs=row.reduce((a,b)=>a+b,0);
+      html+=`<tr><td style="background:#F8FAFC;font-weight:700;color:#0A2342;padding:10px 14px;border:1px solid #E2E8F0;font-size:12px;">${lbls[i]}</td>
+        ${row.map((v,j)=>{
+          const p=rs>0?v/rs:0;
+          const bg=i===j?`rgba(31,78,121,${0.15+p*0.75})`:v>0?`rgba(239,68,68,${0.1+p*0.5})`:'#F8FAFC';
+          const col=i===j&&p>0.5?'white':'#0F172A';
+          return `<td style="text-align:center;background:${bg};color:${col};padding:12px 16px;
+            border:1px solid #E2E8F0;font-weight:${i===j?700:400};font-size:15px;">${v}</td>`;
+        }).join('')}</tr>`;
+    });
+    document.getElementById('cmDiag').innerHTML=html+'</table>';
+  }
+
+  // DIAG vs CIR table
+  if(data.comparison){
+    const base=data.comparison.find(r=>r.f1!==null)?.f1||0;
+    let t=`<table><tr><th>Model</th><th>Approach</th><th>Accuracy</th><th>Macro F1</th><th>vs RF Baseline</th><th>Status</th></tr>`;
+    data.comparison.forEach(r=>{
+      const ok=r.f1!==null;
+      const acc=ok?(r.accuracy*100).toFixed(1)+'%':'88–96% (est.)';
+      const f1s=ok?(r.f1*100).toFixed(1)+'%':'TBD';
+      const diff=ok?((r.f1-base)*100).toFixed(1):null;
+      const db=diff===null?`<span style="color:#0D6E6E;font-size:12px;">+5–13% expected</span>`
+        :parseFloat(diff)===0?'—'
+        :parseFloat(diff)>0?`<span class="badge-green">+${diff}%</span>`
+        :`<span class="badge-red">${diff}%</span>`;
+      const sb=ok?`<span class="badge-green">Complete</span>`:`<span class="badge-amber">Pending</span>`;
+      t+=`<tr><td><strong>${r.model}</strong></td><td>${r.approach}</td><td>${acc}</td><td><strong>${f1s}</strong></td><td>${db}</td><td>${sb}</td></tr>`;
+    });
+    document.getElementById('comparisonTable').innerHTML=t+'</table>';
+  }
+
+  // Feature importance
+  if(data.feature_importance){
+    const feats=Object.entries(data.feature_importance).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const maxV=feats[0][1];
+    let ft=`<table style="width:100%;border-collapse:collapse;font-size:13px;">
+      <tr style="background:#0A2342;">
+        <th style="color:white;padding:9px 14px;font-size:11px;">#</th>
+        <th style="color:white;padding:9px 14px;font-size:11px;">Feature</th>
+        <th style="color:white;padding:9px 14px;font-size:11px;">Board</th>
+        <th style="color:white;padding:9px 14px;font-size:11px;">Type</th>
+        <th style="color:white;padding:9px 14px;font-size:11px;">Importance</th>
+      </tr>`;
+    feats.forEach(([name,val],i)=>{
+      const board=name.includes('boardA')?'A (COM6)':'B (COM8)';
+      const type=name.includes('rssi')?'RSSI':'Distance';
+      const pct=(val/maxV*100).toFixed(0);
+      const color=type==='RSSI'?'#1F4E79':'#0D6E6E';
+      const clean=name.replace('_boardA','').replace('_boardB','');
+      ft+=`<tr style="border-bottom:1px solid #E2E8F0;${i%2===0?'background:#F8FAFC':''}">
+        <td style="padding:9px 14px;color:#94A3B8;font-family:monospace;">${String(i+1).padStart(2,'0')}</td>
+        <td style="padding:9px 14px;font-family:monospace;font-size:12px;">${clean}</td>
+        <td style="padding:9px 14px;"><span style="background:${board.includes('A')?'#EFF6FF':'#F0FDF4'};
+          color:${board.includes('A')?'#1F4E79':'#166534'};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">${board}</span></td>
+        <td style="padding:9px 14px;"><span style="background:${type==='RSSI'?'#EFF6FF':'#F0FDF4'};
+          color:${type==='RSSI'?'#1F4E79':'#166534'};font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;">${type}</span></td>
+        <td style="padding:9px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="flex:1;background:#E2E8F0;border-radius:4px;height:8px;">
+              <div style="width:${pct}%;background:${color};height:8px;border-radius:4px;"></div>
+            </div>
+            <span style="font-size:12px;color:#64748B;min-width:42px;">${val.toFixed(4)}</span>
+          </div>
+        </td>
+      </tr>`;
+    });
+    document.getElementById('featureTable').innerHTML=ft+'</table>';
+  }
+
+  // Dataset info
+  if(data.dataset){
+    const d=data.dataset;
+    document.getElementById('datasetInfo').innerHTML=`<table>
+      <tr><td style="color:#64748B;width:200px;">Total sessions</td><td><strong>${d.sessions_total}</strong></td></tr>
+      <tr><td style="color:#64748B;">Training windows</td><td><strong>${d.windows_train}</strong></td></tr>
+      <tr><td style="color:#64748B;">Validation windows</td><td><strong>${d.windows_val}</strong></td></tr>
+      <tr><td style="color:#64748B;">Test windows</td><td><strong>${d.windows_test}</strong></td></tr>
+      <tr><td style="color:#64748B;">Window size</td><td><strong>${d.window_size} frames</strong></td></tr>
+      <tr><td style="color:#64748B;">Features per window</td><td><strong>${d.n_features} (20 × 2 boards)</strong></td></tr>
+      <tr><td style="color:#64748B;">Trained at</td><td><strong>${data.trained_at}</strong></td></tr>
+    </table>`;
+  }
+
+}).catch(()=>{ document.getElementById('pendingMsg').style.display='block'; });
+</script>
+{% endblock %}

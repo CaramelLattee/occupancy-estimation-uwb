@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}FYP UWB Dashboard{% endblock %}</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy:  #0A2342;
+      --blue:  #1F4E79;
+      --mid:   #2E75B6;
+      --light: #BDD7EE;
+      --teal:  #0D6E6E;
+      --bg:    #F0F4F8;
+      --white: #FFFFFF;
+      --gray:  #64748B;
+      --lgray: #E2E8F0;
+      --green: #166534;
+      --lgreen:#DCFCE7;
+      --amber: #92400E;
+      --lamber:#FEF3C7;
+      --red:   #991B1B;
+      --lred:  #FEE2E2;
+      --text:  #1E293B;
+      --card:  #FFFFFF;
+      --radius:10px;
+    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* NAV */
+    nav { background: var(--navy); padding: 0 24px; display: flex; align-items: center; height: 56px; gap: 8px; }
+    nav .brand { color: var(--light); font-weight: 700; font-size: 15px; margin-right: 24px; white-space: nowrap; }
+    nav a { color: #94A3B8; text-decoration: none; font-size: 13.5px; padding: 6px 14px; border-radius: 6px; transition: all .15s; white-space: nowrap; }
+    nav a:hover { color: white; background: rgba(255,255,255,.08); }
+    nav a.active { color: white; background: var(--blue); }
+    nav .spacer { flex: 1; }
+    nav .badge { font-size: 11px; background: var(--teal); color: white; padding: 3px 8px; border-radius: 20px; }
+
+    /* LAYOUT */
+    .page { max-width: 1200px; margin: 0 auto; padding: 28px 20px; }
+    .page-title { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+    .page-sub { font-size: 13px; color: var(--gray); margin-bottom: 24px; }
+
+    /* CARDS */
+    .card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--lgray); padding: 20px; }
+    .card-title { font-size: 13px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 12px; }
+
+    /* GRID */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    @media (max-width: 768px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+
+    /* STAT CARD */
+    .stat { text-align: center; }
+    .stat .val { font-size: 36px; font-weight: 700; color: var(--blue); }
+    .stat .unit { font-size: 13px; color: var(--gray); }
+    .stat .label { font-size: 12px; color: var(--gray); margin-top: 4px; }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 13.5px; font-weight: 600; border: none; cursor: pointer; transition: all .15s; }
+    .btn-primary { background: var(--blue); color: white; }
+    .btn-primary:hover { background: var(--navy); }
+    .btn-success { background: var(--green); color: white; }
+    .btn-danger  { background: var(--red); color: white; }
+    .btn-gray    { background: var(--lgray); color: var(--text); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* BADGE */
+    .badge-green  { background: var(--lgreen); color: var(--green); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .badge-amber  { background: var(--lamber); color: var(--amber); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .badge-red    { background: var(--lred); color: var(--red); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+    .badge-blue   { background: var(--light); color: var(--blue); font-size: 12px; padding: 3px 10px; border-radius: 20px; font-weight: 600; }
+
+    /* TABLE */
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    th { background: var(--navy); color: white; padding: 10px 14px; text-align: left; font-size: 12px; }
+    td { padding: 9px 14px; border-bottom: 1px solid var(--lgray); }
+    tr:hover td { background: #F8FAFC; }
+    tr:last-child td { border-bottom: none; }
+
+    /* MISC */
+    .gap { margin-bottom: 16px; }
+    .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-green { background: #22C55E; }
+    .dot-red   { background: #EF4444; }
+    .dot-amber { background: #F59E0B; }
+    .status-bar { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray); }
+    select { padding: 8px 12px; border-radius: 7px; border: 1px solid var(--lgray); font-size: 13.5px; background: white; }
+    canvas { max-height: 240px; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">UWB Occupancy Dashboard</span>
+  <a href="/"    class="{% if request.endpoint == 'index' %}active{% endif %}">Home</a>
+  <a href="/live" class="{% if request.endpoint == 'live_page' %}active{% endif %}">Live Dashboard</a>
+  <a href="/data" class="{% if request.endpoint == 'data_page' %}active{% endif %}">Data Viewer</a>
+  <a href="/ml"   class="{% if request.endpoint == 'ml_page' %}active{% endif %}">ML Results</a>
+  <div class="spacer"></div>
+  <span class="badge">EEM 499 | USM</span>
+</nav>
+{% block content %}{% endblock %}
+</body>
+</html>

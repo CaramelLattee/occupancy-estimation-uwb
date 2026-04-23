@@ -1,0 +1,16 @@
+﻿# Virtual environment
+.venv/
+
+# VS Code
+.vscode/
+
+# HDF5 data files (too large for GitHub)
+data/*.h5
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Model files (large binary files)
+models/*.pkl

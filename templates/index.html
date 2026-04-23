@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Home — FYP UWB Dashboard{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="page-title">Occupancy Estimation Using UWB Radar</div>
+  <div class="page-sub">EEM 499 Final Year Project — Muhammad Hafizul Bin Ahmad Husni | 161115 | USM</div>
+
+  <div class="grid-3 gap">
+    <a href="/live" style="text-decoration:none">
+      <div class="card" style="border-left:4px solid #1F4E79; cursor:pointer;">
+        <div class="card-title">Live Dashboard</div>
+        <div style="font-size:28px; margin-bottom:6px;">📡</div>
+        <div style="font-size:14px; color:#374151;">Stream real-time distance and RSSI from both boards. See live occupancy estimate.</div>
+      </div>
+    </a>
+    <a href="/data" style="text-decoration:none">
+      <div class="card" style="border-left:4px solid #0D6E6E; cursor:pointer;">
+        <div class="card-title">Data Viewer</div>
+        <div style="font-size:28px; margin-bottom:6px;">📂</div>
+        <div style="font-size:14px; color:#374151;">Browse all collected HDF5 sessions. View signal distributions per occupancy label.</div>
+      </div>
+    </a>
+    <a href="/ml" style="text-decoration:none">
+      <div class="card" style="border-left:4px solid #7C3AED; cursor:pointer;">
+        <div class="card-title">ML Results</div>
+        <div style="font-size:28px; margin-bottom:6px;">🤖</div>
+        <div style="font-size:14px; color:#374151;">View classifier accuracy, confusion matrix, and DIAG vs CIR comparison.</div>
+      </div>
+    </a>
+  </div>
+
+  <div class="grid-2 gap">
+    <div class="card">
+      <div class="card-title">Hardware Configuration</div>
+      <table>
+        <tr><td style="color:#64748B; width:140px;">Board A</td><td><strong>COM6</strong> — Initiator (INITF)</td></tr>
+        <tr><td style="color:#64748B;">Board B</td><td><strong>COM8</strong> — Responder (RESPF)</td></tr>
+        <tr><td style="color:#64748B;">UWB Channel</td><td>Channel 5 — 6.5 GHz / 499.2 MHz BW</td></tr>
+        <tr><td style="color:#64748B;">Frame rate</td><td>~5.3 fps per board</td></tr>
+        <tr><td style="color:#64748B;">Separation</td><td>~185 cm (fixed)</td></tr>
+        <tr><td style="color:#64748B;">Baud rate</td><td>115200 bps (J20 port)</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Dataset Status</div>
+      <table>
+        <tr><th>Label</th><th>Description</th><th>Sessions</th><th>Target</th><th>Status</th></tr>
+        {% for s in dataset_status %}
+        <tr>
+          <td>{{ s.label }}</td>
+          <td>{{ s.desc }}</td>
+          <td><strong>{{ s.count }}</strong></td>
+          <td>{{ s.target }}</td>
+          <td>
+            {% if s.done %}
+              <span class="badge-green">Complete</span>
+            {% elif s.count > 0 %}
+              <span class="badge-amber">{{ s.count }}/{{ s.target }}</span>
+            {% else %}
+              <span class="badge-red">Pending</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        <tr style="background:#F8FAFC;">
+          <td colspan="2"><strong>Total</strong></td>
+          <td><strong>{{ dataset_status|sum(attribute='count') }}</strong></td>
+          <td>40</td>
+          <td>
+            {% set total = dataset_status|sum(attribute='count') %}
+            {% if total >= 40 %}
+              <span class="badge-green">All Complete</span>
+            {% else %}
+              <span class="badge-amber">{{ total }}/40</span>
+            {% endif %}
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">About This Project</div>
+    <p style="font-size:14px; color:#374151; line-height:1.7;">
+      This dashboard provides a local web interface for the FYP occupancy estimation system using two Qorvo DWM3001CDK UWB radar boards.
+      The Live Dashboard streams real-time ranging data from both boards and provides an instant occupancy estimate based on RSSI thresholds.
+      The Data Viewer allows browsing and visualising all collected HDF5 sessions with signal distribution charts.
+      The ML Results page will display classifier performance once training is complete.
+    </p>
+  </div>
+</div>
+{% endblock %}

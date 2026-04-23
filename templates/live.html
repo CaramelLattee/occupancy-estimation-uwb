@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Live Dashboard — FYP UWB{% endblock %}
+{% block content %}
+<div class="page">
+  <div class="page-title">Live Dashboard</div>
+  <div class="page-sub">Real-time UWB ranging data from both DWM3001CDK boards</div>
+
+  <!-- Controls -->
+  <div class="card gap">
+    <div class="row">
+      <button class="btn btn-success" id="btnStart" onclick="startLive()">Start Boards</button>
+      <button class="btn btn-danger"  id="btnStop"  onclick="stopLive()" disabled>Stop</button>
+      <div class="status-bar">
+        <span class="dot" id="statusDot" style="background:#94A3B8"></span>
+        <span id="statusText">Not connected</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Occupancy banner -->
+  <div class="card gap" id="occupancyCard" style="background:#EFF6FF; border:2px solid #BFDBFE;">
+    <div style="text-align:center;">
+      <div style="font-size:13px; color:#64748B; margin-bottom:4px; font-weight:600; text-transform:uppercase; letter-spacing:.5px;">Estimated Occupancy</div>
+      <div id="occupancyVal" style="font-size:42px; font-weight:800; color:#1F4E79;">—</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid-4 gap">
+    <div class="card stat">
+      <div class="card-title">Board A — Distance</div>
+      <div class="val" id="dist0">—</div>
+      <div class="unit">cm</div>
+      <div class="label">Initiator (COM6)</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Board A — RSSI</div>
+      <div class="val" id="rssi0">—</div>
+      <div class="unit">dBm</div>
+      <div class="label">Initiator (COM6)</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Board B — Distance</div>
+      <div class="val" id="dist1">—</div>
+      <div class="unit">cm</div>
+      <div class="label">Responder (COM8)</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Board B — RSSI</div>
+      <div class="val" id="rssi1">—</div>
+      <div class="unit">dBm</div>
+      <div class="label">Responder (COM8)</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid-2 gap">
+    <div class="card">
+      <div class="card-title">Distance over time (cm)</div>
+      <canvas id="chartDist"></canvas>
+    </div>
+    <div class="card">
+      <div class="card-title">RSSI over time (dBm)</div>
+      <canvas id="chartRssi"></canvas>
+    </div>
+  </div>
+
+  <!-- Frame counters -->
+  <div class="grid-2">
+    <div class="card stat">
+      <div class="card-title">Board A frames</div>
+      <div class="val" id="frames0" style="font-size:28px;">0</div>
+    </div>
+    <div class="card stat">
+      <div class="card-title">Board B frames</div>
+      <div class="val" id="frames1" style="font-size:28px;">0</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const MAX_PTS = 100;
+const makeChart = (id, label0, label1, color0, color1, yLabel) => new Chart(document.getElementById(id).getContext('2d'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { label: label0, data: [], borderColor: color0, backgroundColor: color0+'22', borderWidth:2, pointRadius:0, tension:.3, fill:false },
+      { label: label1, data: [], borderColor: color1, backgroundColor: color1+'22', borderWidth:2, pointRadius:0, tension:.3, fill:false },
+    ]
+  },
+  options: {
+    animation: false,
+    responsive: true,
+    plugins: { legend: { position:'top' } },
+    scales: {
+      x: { display: false },
+      y: { title: { display: true, text: yLabel }, grid: { color:'#E2E8F0' } }
+    }
+  }
+});
+
+const distChart = makeChart('chartDist','Board A','Board B','#1F4E79','#0D6E6E','Distance (cm)');
+const rssiChart = makeChart('chartRssi','Board A','Board B','#1F4E79','#0D6E6E','RSSI (dBm)');
+let es = null, t0 = Date.now();
+
+function pushPoint(chart, t, v0, v1) {
+  const s = ((t - t0)/1000).toFixed(1) + 's';
+  [chart.data.labels, chart.data.datasets[0].data, chart.data.datasets[1].data].forEach((arr,i) => {
+    const val = [s,v0,v1][i];
+    arr.push(val);
+    if(arr.length > MAX_PTS) arr.shift();
+  });
+  chart.update('none');
+}
+
+function startLive() {
+  fetch('/api/live/start', {method:'POST'}).then(r=>r.json()).then(d=>{
+    if(!d.ok){ alert(d.msg); return; }
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    document.getElementById('statusDot').style.background = '#22C55E';
+    document.getElementById('statusText').textContent = 'Connected — streaming';
+    t0 = Date.now();
+    es = new EventSource('/api/live/stream');
+    es.onmessage = e => {
+      const d = JSON.parse(e.data);
+      if(d.ping) return;
+      const now = Date.now();
+      document.getElementById('dist0').textContent = d.dist0;
+      document.getElementById('rssi0').textContent = d.rssi0;
+      document.getElementById('dist1').textContent = d.dist1;
+      document.getElementById('rssi1').textContent = d.rssi1;
+      document.getElementById('frames0').textContent = d.frames0;
+      document.getElementById('frames1').textContent = d.frames1;
+      document.getElementById('occupancyVal').textContent = d.occupancy;
+      pushPoint(distChart, now, d.dist0, d.dist1);
+      pushPoint(rssiChart, now, d.rssi0, d.rssi1);
+    };
+  });
+}
+
+function stopLive() {
+  fetch('/api/live/stop', {method:'POST'});
+  if(es){ es.close(); es=null; }
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('statusDot').style.background = '#94A3B8';
+  document.getElementById('statusText').textContent = 'Stopped';
+}
+</script>
+{% endblock %}
